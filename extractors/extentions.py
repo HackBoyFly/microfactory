@@ -1,7 +1,9 @@
 from benedict.dicts import benedict
+from fsutil import download_file
 from jsonschema import validate, exceptions as vexceptions
 from tools.tools import dictSelector
 import ast
+import requests
 
 class BaseFile:
 
@@ -12,12 +14,8 @@ class BaseFile:
         self.status = 201
         self.errors = {
             'schema_validation':[],
-            'type_conversion':[]
-        }
-        self.response = {
-            'errors':self.errors,
-            'content':self.content,
-            'status':self.status
+            'type_conversion':[],
+            'network':[]
         }
 
         if self.settings:
@@ -33,7 +31,44 @@ class BaseFile:
         self.status = 400
         if len(self.errors[key]) <= 5:
             self.errors[key].append(msg)
-  
+
+    def gen_response(self):
+       return {
+            'errors':self.errors,
+            'content':self.content,
+            'status':self.status,
+        }
+
+class HTTP(BaseFile): 
+
+    def __init__(self, filename=None, content=None, settings=None):
+        BaseFile.__init__(self, filename=filename, content=content, settings=settings)
+        self.download(self.settings['url'])
+    
+    def download(self, url):
+        r = requests.get(url, allow_redirects=True)
+        self.status = r.status_code
+
+        if self.status == 200:
+            self.convert(r)
+        else:
+            self.add_error('network', 'Download failed')
+    
+    def convert(self, r):
+    
+        if r.headers['Content-type'] == 'application/json':
+            try:
+                raw_file = r.json()
+                file = JSON(content=raw_file, settings=self.settings)
+                self.content = file.content
+                self.errors = file.errors
+            except Exception as e:
+                print(e)
+                self.add_error('network', 'Failed to convert file to JSON')
+
+        else:
+            self.add_error('network', 'Content-type not supported')
+
 
 class CSV(BaseFile):
 

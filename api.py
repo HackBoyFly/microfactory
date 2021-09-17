@@ -17,13 +17,10 @@ def recieve(rid):
 
 @app.route('/api/v1/extract/fetch/<int:fid>', methods=['POST'])
 def fetch(fid):
-
     # get request data
     request_data = flask.request.get_json()
-    file = fetchers.FetchHTTP(request_data=request_data)
-    file.convert_to_file()
-    return file.response, file.status
-
+    file = extentions.HTTP(content=None, settings=request_data.get('settings', None))
+    return file.gen_response(), file.status
 
     '''
     # get request data 
