@@ -6,18 +6,16 @@ import requests
 
 class BaseFile:
 
-    def __init__(self, filename=None, content=None, settings=None):
-        self.filename = filename
+    def __init__(self, content=None, settings=None):
         self.content = content 
         self.settings = settings
         self.status = 201
         self.errors = {
             'schema_validation':[],
             'type_conversion':[],
-            'network':[]
         }
 
-        if self.settings:
+        if self.settings and isinstance(self, JSON):
             self.apply_settings()
 
     def apply_settings(self):
@@ -26,12 +24,12 @@ class BaseFile:
         if self.settings.get('schema'):
             self.validate_schema()
 
-    def add_error(self, key, msg):
-        self.status = 400
+    def add_error(self, key, msg, status=400):
+        self.status = status
         if len(self.errors[key]) <= 5:
             self.errors[key].append(msg)
 
-    def gen_response(self):
+    def get_response(self):
        return {
             'errors':self.errors,
             'content':self.content,
@@ -40,60 +38,59 @@ class BaseFile:
 
 class HTTP(BaseFile): 
 
-    def __init__(self, filename=None, content=None, settings=None):
-        BaseFile.__init__(self, filename=filename, content=content, settings=settings)
+    def __init__(self, content=None, settings=None):
+        BaseFile.__init__(self,  content=content, settings=settings)
+        self.errors['network'] = []
         self.download(self.settings['url'])
     
     def download(self, url):
-        r = requests.get(url, allow_redirects=True)
-        self.status = r.status_code
-
+     
+        # TODO catch timeout
+        try:
+            r = requests.get(url, allow_redirects=True, timeout=30)
+            self.status = r.status_code
+        except Exception as e:
+            self.status = 408
+    
         if self.status == 200:
             self.convert(r)
         else:
-            self.add_error('network', 'Download failed')
+            self.add_error('network', 'Download failed', 404)
     
     def convert(self, r):
     
         if r.headers['Content-type'] == 'application/json':
+
             try:
                 raw_file = r.json()
-                file = JSON(content=raw_file, settings=self.settings)
-                self.content = file.content
-                self.errors = file.errors
             except Exception as e:
-                print(e)
                 self.add_error('network', 'Failed to convert file to JSON')
+                
+            file = JSON(content=raw_file, settings=self.settings)
+
+        elif r.headers['Content-type'] == 'text/csv':
+
+            try:
+                raw_file = r.content.decode('utf-8')
+            except Exception as e:
+                self.add_error(str(e))
+
+            file = CSV(content=raw_file)
+
         else:
+            print(r.headers['Content-type'])
             self.add_error('network', 'Content-type not supported')
 
-
-class CSV(BaseFile):
-
-    def __init__(self, filename=None, content=None, settings=None):
-        print(content)
-        BaseFile.__init__(self, filename=filename, content=content, settings=settings)
-        self.extention = 'JSON'
-
-    def validate_schema(self):
-        print("No schema validation for csv")
-        for row in self.content:
-            print(row)
-
-    def convert_to_json(self):
-        #TODO 
-        # Convert CSV to json 
-        # Move schema and convert to basefile
-        pass 
+        self.content = file.content
+        self.errors.update(file.errors)
 
 class JSON(BaseFile):
 
-    def __init__(self, filename=None, content=None, settings=None):
-        BaseFile.__init__(self, filename=filename, content=content, settings=settings)
+    def __init__(self, content=None, settings=None):
+        BaseFile.__init__(self, content=content, settings=settings)
 
     def validate_schema(self):
 
-        # Move to base file
         try:
             validate(instance=self.content, schema=self.settings['schema'])
         except vexceptions.ValidationError as e:
@@ -102,8 +99,6 @@ class JSON(BaseFile):
             self.add_error('schema_validation', e.message)
 
     def type_conversion(self):
-
-        # Moveto base file
 
         b = benedict(self.content)
         path_map = dictSelector(b, key_list=self.settings['type_conversion'].keys())
@@ -130,3 +125,15 @@ class JSON(BaseFile):
                             self.add_error('type_conversion', str(e))
                     
         return b._dict
+
+class CSV(BaseFile):
+
+    def __init__(self, content=None, settings=None):
+        BaseFile.__init__(self, content=content, settings=settings)
+
+
+    def gen_csv_file(self):
+        print("lol")
+
+    def convert_to_json(self):
+        pass
