@@ -1,5 +1,4 @@
 from benedict.dicts import benedict
-from fsutil import download_file
 from jsonschema import validate, exceptions as vexceptions
 from tools.tools import dictSelector
 import ast
@@ -95,7 +94,6 @@ class JSON(BaseFile):
     def validate_schema(self):
 
         # Move to base file
-
         try:
             validate(instance=self.content, schema=self.settings['schema'])
         except vexceptions.ValidationError as e:
