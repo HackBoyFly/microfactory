@@ -65,7 +65,6 @@ class HTTP(BaseFile):
             except Exception as e:
                 print(e)
                 self.add_error('network', 'Failed to convert file to JSON')
-
         else:
             self.add_error('network', 'Content-type not supported')
 

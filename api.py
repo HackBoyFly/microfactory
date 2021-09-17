@@ -1,6 +1,5 @@
 import flask
-from extractors import extentions, fetchers
-import csv
+from extractors import extentions
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True 
@@ -13,7 +12,7 @@ def home():
 def recieve(rid):
     request_data = flask.request.get_json()
     file = extentions.JSON(content=request_data['content'], settings=request_data.get('settings', None))
-    return file.response, file.status
+    return file.gen_response(), file.status
 
 @app.route('/api/v1/extract/fetch/<int:fid>', methods=['POST'])
 def fetch(fid):
