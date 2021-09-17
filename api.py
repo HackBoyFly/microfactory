@@ -13,11 +13,19 @@ def home():
 def recieve(rid):
     request_data = flask.request.get_json()
     file = extentions.JSON(content=request_data['content'], settings=request_data.get('settings', None))
-    return file.errors, file.status
+    return file.response, file.status
 
 @app.route('/api/v1/extract/fetch/<int:fid>', methods=['POST'])
 def fetch(fid):
 
+    # get request data
+    request_data = flask.request.get_json()
+    file = fetchers.FetchHTTP(request_data=request_data)
+    file.convert_to_file()
+    return file.response, file.status
+
+
+    '''
     # get request data 
     request_data = flask.request.get_json()
 
@@ -52,5 +60,6 @@ def fetch(fid):
         file = extentions.CSV(content=csv_file, settings=tmp_csv_settings)
     
     return file.errors, file.status
+    '''
 
 app.run()
