@@ -2,7 +2,6 @@ from benedict.dicts import benedict
 from jsonschema import validate, exceptions as vexceptions
 from tools.tools import dictSelector
 import ast
-import requests
 import csv
 
 class BaseFile:
@@ -52,53 +51,6 @@ class BaseFile:
         return final
 
 
-class HTTP(BaseFile):
-
-    def __init__(self, content=None, settings=None):
-        BaseFile.__init__(self,  content=content, settings=settings)
-        self.errors['network'] = []
-        self.download(self.settings['url'])
-
-    def download(self, url):
-        # TODO catch timeout
-        try:
-            r = requests.get(url, allow_redirects=True, timeout=30)
-            self.status = r.status_code
-        except Exception as e:
-            self.add_error('network', 'Timeout request', 408)
-
-        if self.status == 200:
-            self.convert(r)
-        else:
-            self.add_error('network', 'Download failed', 404)
-
-    def convert(self, r):
-        ct = r.headers['Content-type']
-        if ct == 'application/json':
-            try:
-                raw_file = r.json()
-            except Exception as e:
-                self.add_error('network', 'Failed to convert file to JSON')
-
-            file = JSON(content=raw_file, settings=self.settings)
-
-        elif ct:
-            try:
-                raw_file = r.content.decode('utf-8')
-            except Exception as e:
-                self.add_error(str(e))
-
-            file = CSV(content=raw_file, settings=self.settings)
-
-        else:
-            self.add_error(
-                'network', 'Content-type not supported {ct}'.format(ct=ct))
-
-        self.content = file.content
-        self.errors.update(file.errors)
-        self.status = file.status
-
-
 class JSON(BaseFile):
 
     def __init__(self, content=None, settings=None):
@@ -107,6 +59,7 @@ class JSON(BaseFile):
     def validate_schema(self):
 
         schema = self.settings['schema']
+        # if content is list-based, fix paths
         if 'jsonlist' in self.content:
             schema = {
                 'type': 'object',
@@ -127,16 +80,16 @@ class JSON(BaseFile):
 
     def type_conversion(self):
 
-        # If file was originally something else
         tc = self.settings['type_conversion']
+        # if content is list-based, fix paths
         tc = {'jsonlist.'+k: v for k,
               v in tc.items()} if 'jsonlist' in self.content else tc
 
+        
         # Create benedict dict
         b = benedict(self.content)
         # Get all possible paths in dict and generate {clean.path:[clean.path[0],..]}
         path_map = dictSelector(b, key_list=tc.keys())
-
         # Loop through path_map and convert values
         for cPath, bPath in path_map.items():
             for sub_path in bPath:
