@@ -116,9 +116,14 @@ class JSON(BaseFile):
 
 class CSV(BaseFile):
 
-    def __init__(self, content=None, settings=None):
+    def __init__(self, content=None, settings=None, file=None, delimiter=','):
+        self.delimiter = delimiter
         BaseFile.__init__(self, content=content, settings=settings)
 
+        if file: 
+            with open('test.csv', 'r') as csvfile:
+                self.content = csvfile.read()
+                
         self.gen_csv_file()
 
     def gen_csv_file(self):
@@ -128,7 +133,7 @@ class CSV(BaseFile):
         except Exception as e:
             self.add_error('file_conversion', 'Failed to decode csv utf-8')
         
-        cdict = csv.DictReader(self.content.splitlines(), delimiter=';')
+        cdict = csv.DictReader(self.content.splitlines(), delimiter=self.delimiter)
         jdict = {'jsonlist': [d for d in cdict]}
         self.convert_to_json(jdict)
 

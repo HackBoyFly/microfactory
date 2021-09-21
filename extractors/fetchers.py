@@ -31,14 +31,9 @@ class HTTP2JSON(BaseFile):
 
             file = JSON(content=raw_file, settings=self.settings)
 
-        elif ct:
-            try:
-                raw_file = r.content.decode('utf-8')
-            except Exception as e:
-                self.add_error(str(e))
-
+        elif ct == 'text/csv':
+            raw_file = r.content
             file = CSV(content=raw_file, settings=self.settings)
-
         else:
             self.add_error(
                 'network', 'Content-type not supported {ct}'.format(ct=ct))
